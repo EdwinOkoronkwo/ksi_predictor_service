@@ -407,25 +407,7 @@ class TrainingPipeline:
 
         self.logger.info("--- Saving process completed ---")
 
-    def run(self):
-        """Runs the entire training pipeline."""
-        self.logger.info("--- Starting Training Pipeline ---")
-        self.load_and_explore_data()
-        if self.data is not None:
-            self.preprocess_data()
-            if self.X_train is not None:
-                self.initialize_models()
-                self.train_and_tune_models()
-                self.create_and_evaluate_ensembles()
-                self.evaluate_models()
-                self.save_best_model()  # Add the saving step here
-            else:
-                self.logger.warning("Preprocessing did not complete successfully.")
-        else:
-            self.logger.warning("Data loading failed, cannot proceed with pipeline.")
-        self.logger.info("--- Training Pipeline Finished ---")
 
 
 
 
-    # Add methods for model training, evaluation, etc.
