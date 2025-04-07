@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import {TextField, Checkbox, FormControlLabel, Button, Typography, Paper, Grid, Slider, Container, Box, Card, Divider, LinearProgress, Chip, Alert, Avatar
-} from '@mui/material';
+import { TextField, Button, Typography, Paper, Grid, Container, Box, Divider, Chip, Alert, Avatar, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress} from '@mui/material';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { teal, deepOrange, indigo } from '@mui/material/colors';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import RoadIcon from '@mui/icons-material/Signpost';
+import TrafficIcon from '@mui/icons-material/Traffic';
+import WbSunnyIcon from '@mui/icons-material/WbSunny';
 import './FeatureInputForm.css';
 
 const theme = createTheme({
@@ -21,290 +25,361 @@ const theme = createTheme({
 
 const FeatureInputForm = () => {
   const [features, setFeatures] = useState({
-    "categorical__IMPACTYPE_Pedestrian Collisions": 0,
-    "numerical__LATITUDE": '',
-    "categorical__VEHTYPE_Automobile, Station Wagon": 0,
-    "numerical__LONGITUDE": '',
-    "categorical__INITDIR_East": 0,
-    "numerical__combined_xy": 0.5,
-    "categorical__INITDIR_West": 0,
-    "categorical__MANOEUVER_Going Ahead": 0,
-    "categorical__ROAD_CLASS_Major Arterial": 0,
-    "categorical__DRIVACT_Driving Properly": 0
+    TIME: '12:00',
+    LATITUDE: '',
+    LONGITUDE: '',
+    ROAD_CLASS: 'Major Arterial',
+    DISTRICT: 'Scarborough',
+    ACCLOC: 'At Intersection',
+    TRAFFCTL: 'Traffic Signal',
+    VISIBILITY: 'Clear',
+    LIGHT: 'Daylight',
+    RDSFCOND: 'Dry'
   });
 
   const [prediction, setPrediction] = useState(null);
   const [probability, setProbability] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [openResults, setOpenResults] = useState(false);
 
   const handleChange = (e) => {
-    const { name, type, checked, value } = e.target;
-    setFeatures((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? (checked ? 1 : 0) : value,
-    }));
-  };
-
-  const handleSliderChange = (name, value) => {
-    setFeatures((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    const { name, value } = e.target;
+    setFeatures(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    try {
-      const submissionFeatures = {
-        ...features,
-        "numerical__LATITUDE": features["numerical__LATITUDE"] === '' ? null : parseFloat(features["numerical__LATITUDE"]),
-        "numerical__LONGITUDE": features["numerical__LONGITUDE"] === '' ? null : parseFloat(features["numerical__LONGITUDE"])
-      };
 
-      const res = await axios.post('http://localhost:5000/predict', { features: submissionFeatures });
+    try {
+      const res = await axios.post('http://localhost:5000/predict', {
+        features: {
+          ...features,
+          LATITUDE: parseFloat(features.LATITUDE),
+          LONGITUDE: parseFloat(features.LONGITUDE)
+        }
+      });
       setPrediction(res.data.prediction);
       setProbability(res.data.probability);
-    }
-    catch (err) {
-      console.error(err);
-      setError('Prediction failed. Please check your inputs and try again.');
+      setOpenResults(true);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Prediction failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleCloseResults = () => {
+    setOpenResults(false);
+  };
+
   return (
     <ThemeProvider theme={theme}>
       <div className="predictor-container">
-        <Container maxWidth="lg">
+        <Container maxWidth="md">
           <Paper elevation={6} className="main-paper">
             {/* Header */}
             <div className="header-container">
-              <Avatar className="header-avatar">
+              <Avatar className="header-avatar" sx={{ bgcolor: indigo[500] }}>
                 <Typography variant="h4">!</Typography>
               </Avatar>
-              <Typography variant="h3" className="header-title">Accident Risk Predictor</Typography>
+              <Typography variant="h4" className="header-title">Accident Risk Predictor</Typography>
               <Typography variant="subtitle1" className="header-subtitle">
-                Input road, vehicle, and behavioral data to predict severity
+                Complete all fields to predict accident severity
               </Typography>
             </div>
 
-            {/* Main Content */}
-            <div className="content-container">
-              <Grid container spacing={0} className="main-grid">
-                {/* Form Section */}
-                <Grid item xs={12} md={6} className="form-section">
-                  <Box component="form" onSubmit={handleSubmit} className="form-container">
-                    {/* Location Section */}
-                    <div className="form-section-container">
-                      <Typography variant="h5" className="section-title">
-                        <span>📌</span> Location Data
-                      </Typography>
-                      <Divider className="section-divider" />
-                      <Grid container spacing={2}>
-                        <Grid item xs={6}>
-                          <TextField
-                            fullWidth
-                            label="Latitude"
-                            name="numerical__LATITUDE"
-                            value={features["numerical__LATITUDE"]}
-                            onChange={handleChange}
-                            type="number"
-                            inputProps={{ step: 0.0001 }}
-                            variant="outlined"
-                            className="form-field"
-                          />
-                        </Grid>
-                        <Grid item xs={6}>
-                          <TextField
-                            fullWidth
-                            label="Longitude"
-                            name="numerical__LONGITUDE"
-                            value={features["numerical__LONGITUDE"]}
-                            onChange={handleChange}
-                            type="number"
-                            inputProps={{ step: 0.0001 }}
-                            variant="outlined"
-                            className="form-field"
-                          />
-                        </Grid>
-                      </Grid>
-                    </div>
+            {/* Form Section */}
+            <Box component="form" onSubmit={handleSubmit} className="form-container">
+              {/* Location */}
+              <div className="form-section-container">
+                <Typography variant="h6" className="section-title">
+                  <AccessTimeIcon fontSize="small" />
+                  Time
+                </Typography>
+                <Divider className="section-divider"/>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                        fullWidth
+                        label="Time (HH:MM)"
+                        name="TIME"
+                        value={features.TIME}
+                        onChange={handleChange}
+                        variant="outlined"
+                        margin="normal"
+                        required
+                    />
+                  </Grid>
+                </Grid>
+              </div>
+              <div className="form-section-container">
+                <Typography variant="h6" className="section-title">
+                  <LocationOnIcon fontSize="small"/>
+                  Location
+                </Typography>
+                <Divider className="section-divider"/>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                        fullWidth
+                        label="Latitude"
+                        name="LATITUDE"
+                        value={features.LATITUDE}
+                        onChange={handleChange}
+                        type="number"
+                        inputProps={{step: 0.0001}}
+                        variant="outlined"
+                        margin="normal"
+                        required
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                        fullWidth
+                        label="Longitude"
+                        name="LONGITUDE"
+                        value={features.LONGITUDE}
+                        onChange={handleChange}
+                        type="number"
+                        inputProps={{step: 0.0001}}
+                        variant="outlined"
+                        margin="normal"
+                        required
+                    />
+                  </Grid>
+                </Grid>
+              </div>
 
-                    {/* Collision Details */}
-                    <div className="form-section-container">
-                      <Typography variant="h5" className="section-title">
-                        <span>🚗</span> Collision Details
-                      </Typography>
-                      <Divider className="section-divider" />
-                      <div className="checkbox-group">
-                        <FormControlLabel
-                          control={
-                            <Checkbox
-                              checked={features["categorical__IMPACTYPE_Pedestrian Collisions"] === 1}
-                              onChange={handleChange}
-                              name="categorical__IMPACTYPE_Pedestrian Collisions"
-                              color="primary"
-                            />
-                          }
-                          label="Pedestrian Collision"
-                          className="form-label"
-                        />
-                        <FormControlLabel
-                          control={
-                            <Checkbox
-                              checked={features["categorical__VEHTYPE_Automobile, Station Wagon"] === 1}
-                              onChange={handleChange}
-                              name="categorical__VEHTYPE_Automobile, Station Wagon"
-                              color="primary"
-                            />
-                          }
-                          label="Automobile / Station Wagon"
-                          className="form-label"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Direction */}
-                    <div className="form-section-container">
-                      <Typography variant="h5" className="section-title">
-                        <span>🧭</span> Direction
-                      </Typography>
-                      <Divider className="section-divider" />
-                      <div className="checkbox-group">
-                        <FormControlLabel
-                          control={
-                            <Checkbox
-                              checked={features["categorical__INITDIR_East"] === 1}
-                              onChange={handleChange}
-                              name="categorical__INITDIR_East"
-                              color="primary"
-                            />
-                          }
-                          label="Traveling East"
-                          className="form-label"
-                        />
-                        <FormControlLabel
-                          control={
-                            <Checkbox
-                              checked={features["categorical__INITDIR_West"] === 1}
-                              onChange={handleChange}
-                              name="categorical__INITDIR_West"
-                              color="primary"
-                            />
-                          }
-                          label="Traveling West"
-                          className="form-label"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Road Conditions */}
-                    <div className="form-section-container">
-                      <Typography variant="h5" className="section-title">
-                        <span>🛣️</span> Road Conditions
-                      </Typography>
-                      <Divider className="section-divider" />
-                      <div className="checkbox-group">
-                        <FormControlLabel
-                          control={
-                            <Checkbox
-                              checked={features["categorical__ROAD_CLASS_Major Arterial"] === 1}
-                              onChange={handleChange}
-                              name="categorical__ROAD_CLASS_Major Arterial"
-                              color="primary"
-                            />
-                          }
-                          label="Major Arterial Road"
-                          className="form-label"
-                        />
-                      </div>
-                      <div className="slider-container">
-                        <Typography className="slider-label">Combined XY Value</Typography>
-                        <Slider
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          value={features["numerical__combined_xy"]}
-                          onChange={(e, val) => handleSliderChange("numerical__combined_xy", val)}
-                          valueLabelDisplay="auto"
-                          className="form-slider"
-                        />
-                      </div>
-                    </div>
-
-                    <Button
-                      type="submit"
-                      fullWidth
-                      variant="contained"
-                      color="primary"
-                      size="large"
-                      disabled={loading}
-                      className="submit-button"
+              {/* Road Conditions */}
+              <div className="form-section-container">
+                <Typography variant="h6" className="section-title">
+                  <RoadIcon fontSize="small"/>
+                  Road Conditions
+                </Typography>
+                <Divider className="section-divider"/>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                        select
+                        fullWidth
+                        label="Road Class"
+                        name="ROAD_CLASS"
+                        value={features.ROAD_CLASS}
+                        onChange={handleChange}
+                        variant="outlined"
+                        margin="normal"
                     >
-                      {loading ? 'Analyzing...' : 'Predict Severity'}
-                    </Button>
-                  </Box>
+                      {['Major Arterial', 'Minor Arterial', 'Collector', 'Local', 'Expressway'].map(option => (
+                          <MenuItem key={option} value={option}>{option}</MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                        select
+                        fullWidth
+                        label="District"
+                        name="DISTRICT"
+                        value={features.DISTRICT}
+                        onChange={handleChange}
+                        variant="outlined"
+                        margin="normal"
+                    >
+                      {['Scarborough', 'North York', 'Etobicoke York', 'Toronto and East York'].map(option => (
+                          <MenuItem key={option} value={option}>{option}</MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                        select
+                        fullWidth
+                        label="Road Surface"
+                        name="RDSFCOND"
+                        value={features.RDSFCOND}
+                        onChange={handleChange}
+                        variant="outlined"
+                        margin="normal"
+                    >
+                      {['Dry', 'Wet', 'Snow', 'Ice', 'Slush'].map(option => (
+                          <MenuItem key={option} value={option}>{option}</MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
                 </Grid>
+              </div>
 
-                {/* Results Section */}
-                <Grid item xs={12} md={6} className="results-section">
-                  <div className="results-container">
-                    <Typography variant="h5" className="results-title">
-                      <span>📊</span> Prediction Results
-                    </Typography>
-                    <Divider className="results-divider" />
-
-                    {loading && (
-                      <div className="loading-container">
-                        <LinearProgress className="loading-progress" />
-                        <Typography className="loading-text">Processing...</Typography>
-                      </div>
-                    )}
-
-                    {error && (
-                      <Alert severity="error" className="error-alert">
-                        {error}
-                      </Alert>
-                    )}
-
-                    {prediction !== null ? (
-                      <Card className={`prediction-card ${prediction === 1 ? 'severe' : 'low'}`}>
-                        <div className="risk-meter">
-                          <Typography variant="h2" className="risk-percentage">
-                            {Math.round(probability * 100)}%
-                          </Typography>
-                        </div>
-                        <Typography variant="h4" className="risk-level">
-                          {prediction === 1 ? 'Severe Risk' : 'Low Risk'}
-                        </Typography>
-                        <Typography className="risk-description">
-                          {prediction === 1
-                            ? "High probability of severe injuries or fatalities"
-                            : "Low probability of severe outcomes"}
-                        </Typography>
-                        <Chip
-                          label={`Confidence: ${(probability * 100).toFixed(1)}%`}
-                          className="confidence-chip"
-                          variant="outlined"
-                        />
-                      </Card>
-                    ) : (
-                      <div className="empty-results">
-                        <Typography className="empty-results-text">
-                          Submit the form to see prediction results
-                        </Typography>
-                      </div>
-                    )}
-                  </div>
+              {/* Traffic Conditions */}
+              <div className="form-section-container">
+                <Typography variant="h6" className="section-title">
+                  <TrafficIcon fontSize="small"/>
+                  Traffic Conditions
+                </Typography>
+                <Divider className="section-divider"/>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                        select
+                        fullWidth
+                        label="Accident Location"
+                        name="ACCLOC"
+                        value={features.ACCLOC}
+                        onChange={handleChange}
+                        variant="outlined"
+                        margin="normal"
+                    >
+                      {['At Intersection', 'Non Intersection', 'At/Near Private Drive', 'Intersection Related'].map(option => (
+                          <MenuItem key={option} value={option}>{option}</MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                        select
+                        fullWidth
+                        label="Traffic Control"
+                        name="TRAFFCTL"
+                        value={features.TRAFFCTL}
+                        onChange={handleChange}
+                        variant="outlined"
+                        margin="normal"
+                    >
+                      {['Traffic Signal', 'Stop Sign', 'No Control', 'Pedestrian Crossover'].map(option => (
+                          <MenuItem key={option} value={option}>{option}</MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
                 </Grid>
-              </Grid>
-            </div>
+              </div>
+
+              {/* Weather Conditions */}
+              <div className="form-section-container">
+                <Typography variant="h6" className="section-title">
+                  <WbSunnyIcon fontSize="small"/>
+                  Weather Conditions
+                </Typography>
+                <Divider className="section-divider"/>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                        select
+                        fullWidth
+                        label="Visibility"
+                        name="VISIBILITY"
+                        value={features.VISIBILITY}
+                        onChange={handleChange}
+                        variant="outlined"
+                        margin="normal"
+                    >
+                      {['Clear', 'Rain', 'Snow', 'Fog', 'Freezing Rain'].map(option => (
+                          <MenuItem key={option} value={option}>{option}</MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                        select
+                        fullWidth
+                        label="Lighting"
+                        name="LIGHT"
+                        value={features.LIGHT}
+                        onChange={handleChange}
+                        variant="outlined"
+                        margin="normal"
+                    >
+                      {['Daylight', 'Dark', 'Dark, artificial', 'Dusk', 'Dawn'].map(option => (
+                          <MenuItem key={option} value={option}>{option}</MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                </Grid>
+              </div>
+
+              {error && (
+                  <Alert severity="error" sx={{mb: 2}}>
+                    {error}
+                  </Alert>
+              )}
+
+              <Button
+                  type="submit"
+                  fullWidth
+                  variant="contained"
+                  color="primary"
+                  size="large"
+                  disabled={loading}
+                  sx={{mt: 3, mb: 2, py: 1.5}}
+              >
+                {loading ? (
+                    <>
+                      <CircularProgress size={24} sx={{mr: 1}}/>
+                      Analyzing...
+                    </>
+                ) : 'Predict Severity'}
+              </Button>
+            </Box>
           </Paper>
         </Container>
+
+        {/* Results Dialog */}
+        <Dialog
+            open={openResults}
+            onClose={handleCloseResults}
+            maxWidth="sm"
+            fullWidth
+        >
+          <DialogTitle>
+            <Typography variant="h6" fontWeight="bold">Prediction Results</Typography>
+          </DialogTitle>
+          <DialogContent sx={{textAlign: 'center', py: 4}}>
+            <Box
+                sx={{
+                  width: 180,
+                  height: 180,
+                  borderRadius: '50%',
+                  display: 'inline-flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  border: `8px solid ${prediction === 1 ? deepOrange[500] : teal[500]}`,
+                  backgroundColor: prediction === 1 ? 'rgba(255, 152, 0, 0.1)' : 'rgba(0, 150, 136, 0.1)',
+                  color: prediction === 1 ? deepOrange[900] : teal[900],
+                  mb: 3
+                }}
+            >
+              <Typography variant="h3" fontWeight="bold">
+                {Math.round(probability * 100)}%
+              </Typography>
+              <Typography variant="subtitle1" fontWeight="medium">
+                {prediction === 1 ? 'HIGH RISK' : 'LOW RISK'}
+              </Typography>
+            </Box>
+            <Typography variant="body1" paragraph>
+              {prediction === 1
+                  ? "High probability of severe outcomes"
+                  : "Low probability of severe outcomes"}
+            </Typography>
+            <Chip
+                label={`Confidence: ${(probability * 100).toFixed(1)}%`}
+                color={prediction === 1 ? "warning" : "primary"}
+                variant="outlined"
+                sx={{fontSize: '0.9rem', px: 2}}
+            />
+          </DialogContent>
+          <DialogActions sx={{justifyContent: 'center', pb: 3}}>
+            <Button
+              onClick={handleCloseResults}
+              variant="contained"
+              color="primary"
+              sx={{ px: 4 }}
+            >
+              Done
+            </Button>
+          </DialogActions>
+        </Dialog>
       </div>
     </ThemeProvider>
   );
