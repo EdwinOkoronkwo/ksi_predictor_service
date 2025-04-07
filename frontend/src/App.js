@@ -7,19 +7,7 @@ function App() {
   return (
     <>
       <CssBaseline />
-      <Container
-        maxWidth={false}
-        disableGutters
-        sx={{
-          backgroundImage: `url(${aiImage})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundAttachment: 'fixed',
-            height: '100vh'
-        }}
-      >
-
+      <Container maxWidth={false} disableGutters>
           <FeatureInputForm />
       </Container>
     </>
