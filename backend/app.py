@@ -1,10 +1,15 @@
 import pickle
+import sys
 import numpy as np
+import pandas as pd
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pathlib import Path
 import logging
-import pandas as pd
+
+# Add root directory to sys.path
+ROOT_DIR = Path(__file__).resolve().parent.parent
+sys.path.append(str(ROOT_DIR))
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -14,137 +19,107 @@ CORS(app)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Configuration
+# Configuration paths
 BASE_DIR = Path(__file__).parent.parent
 MODEL_PATH = BASE_DIR / "saved_models/best_model.pkl"
+FEATURE_NAMES_PATH = BASE_DIR / "saved_models/feature_names.pkl"
+PREPROCESSOR_PATH = BASE_DIR / "saved_models/preprocessor.pkl"
 
-# Global variables
+# Global variables for model and metadata
 model = None
-all_features = None
+preprocessor = None
+all_features = []
 feature_importances = None
-top_n_features = 15  # Default number of top features to use
-
 
 def load_model():
-    global model, all_features, feature_importances
-
+    global model, preprocessor, all_features, feature_importances
     try:
         logger.info("Loading model from %s", MODEL_PATH)
         with open(MODEL_PATH, 'rb') as f:
             model = pickle.load(f)
 
-        # Get feature names
-        all_features = (model.feature_names_in_.tolist()
-                        if hasattr(model, 'feature_names_in_')
-                        else [f'feature_{i}' for i in range(model.n_features_in_)])
+        logger.info("Loading feature names from %s", FEATURE_NAMES_PATH)
+        with open(FEATURE_NAMES_PATH, 'rb') as f:
+            all_features = pickle.load(f)
+        if not isinstance(all_features, list):
+            all_features = list(all_features)
 
-        # Get feature importances
+        logger.info("Loading preprocessor from %s", PREPROCESSOR_PATH)
+        with open(PREPROCESSOR_PATH, 'rb') as f:
+            preprocessor = pickle.load(f)
+
+        # Feature importances (if model supports it)
         if hasattr(model, 'feature_importances_'):
-            logger.info("Extracting feature importances")
-            feature_importances = (pd.Series(model.feature_importances_, index=all_features).sort_values(ascending=False))
-            logger.info("Top 10 features by importance: %s",
-                        feature_importances.head(10).to_dict())
+            feature_importances = pd.Series(model.feature_importances_, index=all_features).sort_values(ascending=False)
+            logger.info("Top 10 feature importances: %s", feature_importances.head(10).to_dict())
 
-        logger.info("Successfully loaded model with %d features", len(all_features))
+        logger.info("Model and preprocessor loaded successfully with %d features", len(all_features))
 
     except Exception as e:
-        logger.error("Model loading failed: %s", str(e), exc_info=True)
+        logger.error("Error loading model or preprocessor: %s", str(e), exc_info=True)
         raise
 
-
-# Load model at startup
+# Load everything on startup
 load_model()
 
-# include the important features
-TOP_FEATURES = [
-    'categorical__IMPACTYPE_Pedestrian Collisions',
-    'numerical__LATITUDE',
-    'categorical__VEHTYPE_Automobile, Station Wagon',
-    'numerical__LONGITUDE',
-    'categorical__INITDIR_East',
-    'numerical__combined_xy',
-    'categorical__INITDIR_West',
-    'categorical__MANOEUVER_Going Ahead',
-    'categorical__ROAD_CLASS_Major Arterial',
-    'categorical__DRIVACT_Driving Properly',
-    'categorical__LIGHT_Daylight',
-    'categorical__LIGHT_Dark, artificial',
-    'categorical__TRAFFCTL_Traffic Signal',
-    'categorical__INITDIR_South',
-    'categorical__INITDIR_North'
-]
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
         data = request.get_json()
         if not data or 'features' not in data:
-            logger.warning("Missing features in request")
             return jsonify({'error': 'Missing features'}), 400
 
-        # Create full feature dict with defaults
-        input_values = {f: 0 for f in all_features}
+        input_data = data['features']
+        expected_columns = ['TIME', 'LATITUDE', 'LONGITUDE', 'ROAD_CLASS', 'DISTRICT',
+                           'ACCLOC', 'TRAFFCTL', 'VISIBILITY', 'LIGHT', 'RDSFCOND']
 
-        # Handle different input formats
-        if isinstance(data['features'], dict):
-            logger.debug("Received dictionary input")
-            # Prioritize top features if they exist in input
-            for feature in TOP_FEATURES:
-                if feature in data['features']:
-                    input_values[feature] = data['features'][feature]
-            # then any other features
-            input_values.update(data['features'])
+        # Validate input features
+        input_keys = set(input_data.keys())
+        expected_keys = set(expected_columns)
+        missing_features = expected_keys - input_keys
+        extra_features = input_keys - expected_keys
 
-        elif isinstance(data['features'], list):
-            if len(data['features']) == len(all_features):
-                logger.debug("Received full feature list")
-                input_values.update(zip(all_features, data['features']))
-            elif len(data['features']) <= len(TOP_FEATURES):
-                logger.debug("Received top feature list")
-                input_values.update(zip(TOP_FEATURES[:len(data['features'])], data['features']))
-            else:
-                logger.warning("Invalid list length %d (expected %d or ≤%d)",len(data['features']), len(all_features), len(TOP_FEATURES))
-                return jsonify({
-                    'error': f'For list input, provide either all {len(all_features)} features or up to {len(TOP_FEATURES)} top features',
-                    'top_features': TOP_FEATURES
-                }), 400
+        if missing_features:
+            return jsonify({'error': f'Missing required features: {missing_features}'}), 400
+        if extra_features:
+            logger.warning("Ignoring extra features: %s", extra_features)
 
-        # Prepare final input
-        X = np.array([input_values[f] for f in all_features]).reshape(1, -1)
+        # Convert input to DataFrame with a single row
+        input_df = pd.DataFrame([input_data])[expected_columns]  # Ensure column order matches
+
+        # Preprocess input
+        processed_input = preprocessor.transform(input_df)
 
         # Predict
-        pred = int(model.predict(X)[0])
-        proba = float(model.predict_proba(X)[0][pred]) if hasattr(model, "predict_proba") else None
+        prediction = int(model.predict(processed_input)[0])
+        proba = float(model.predict_proba(processed_input)[0][prediction]) if hasattr(model, 'predict_proba') else None
 
-        # which top features were used
-        used_top_features = [f for f in TOP_FEATURES if input_values[f] != 0]
-        logger.info("Prediction: %d (confidence: %.2f) using %d top features: %s",
-                    pred, proba if proba else 0,
-                    len(used_top_features),
-                    used_top_features)
+        logger.info("Prediction: %d (Confidence: %.4f)", prediction, proba if proba is not None else -1)
 
         return jsonify({
-            'prediction': pred,
-            'probability': proba,
-            'top_features_used': used_top_features,
+            'prediction': prediction,
+            'probability': round(proba, 4) if proba is not None else None,
             'status': 'success'
         })
 
     except Exception as e:
-        logger.error("Prediction failed: %s", str(e), exc_info=True)
+        logger.error("Prediction error: %s", str(e), exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 
-# Update feature info endpoint
 @app.route('/feature_info', methods=['GET'])
 def feature_info():
-    """Get feature metadata"""
-    logger.info("📋 Feature info requested")
-    return jsonify({
-        'total_features': len(all_features),
-        'top_features': TOP_FEATURES,
-        'feature_importances': {k: v for k, v in feature_importances.to_dict().items() if k in TOP_FEATURES}
-    })
+    try:
+        logger.info("Feature metadata requested")
+        return jsonify({
+            'total_features': len(all_features),
+            'feature_names': all_features,
+            'feature_importances': feature_importances.to_dict() if feature_importances is not None else None
+        })
+    except Exception as e:
+        logger.error("Feature info error: %s", str(e), exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    logger.info("Starting Flask server")
+    logger.info("🚀 Starting Flask server on port 5000")
     app.run(host='0.0.0.0', port=5000, debug=True)
