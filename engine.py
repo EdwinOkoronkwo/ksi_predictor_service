@@ -42,14 +42,14 @@ def instantiate_models():
     logger = setup_logger(__name__)
     models = {
         "LogReg": LogisticRegression(random_state=42, solver='liblinear'),
-        # "DTC": DecisionTreeClassifier(random_state=42),
-        # "SVM": SVC(random_state=42, probability=True),
+        "DTC": DecisionTreeClassifier(random_state=42),
+        "SVM": SVC(random_state=42, probability=True),
         "Forest": RandomForestClassifier(random_state=42),
-        # "ANN": MLPClassifier(random_state=42, max_iter=300),
-        # "NBayes": GaussianNB(),
-        # "KNN": KNeighborsClassifier(),
-        # "Voting": VotingClassifier(estimators=[], voting='soft'),  # Estimators will be added later
-        # "Stacking": StackingClassifier(estimators=[], final_estimator=RandomForestClassifier(random_state=42), cv=3)
+        "ANN": MLPClassifier(random_state=42, max_iter=300),
+        "NBayes": GaussianNB(),
+        "KNN": KNeighborsClassifier(),
+        "Voting": VotingClassifier(estimators=[], voting='soft'),  # Estimators will be added later
+        "Stacking": StackingClassifier(estimators=[], final_estimator=RandomForestClassifier(random_state=42), cv=3)
     }
     logger.info("Predictive models instantiated.")
     return models
