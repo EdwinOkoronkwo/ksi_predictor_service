@@ -29,6 +29,8 @@ class TrainOrchestrator:
                 self.logger.info("📊 Models evaluated.")
                 self.pipeline.save_best_model()
                 self.logger.info("💾 Best model saved successfully.")
+                self.pipeline.save_all_models()  # Call the method to save all models
+                self.logger.info("💾 All models saved successfully.")
             else:
                 self.logger.warning("❌ Preprocessing did not complete successfully.")
         else:

@@ -8,7 +8,7 @@ from utils import setup_logger
 import engine
 import set_up
 from visualizer import DataVisualization
-from utils import SaveLoadBestModel
+from utils import SaveLoadBestModel, SaveLoadAllModels
 from set_up import CombinedFeaturesAdder
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_curve, auc
 
@@ -44,6 +44,9 @@ class TrainingPipeline:
         self.pipeline_path = 'saved_models/preprocessor.pkl'
         self.feature_names_path = 'saved_models/feature_names.pkl'
         self.model_saver = SaveLoadBestModel(self.model_path, self.pipeline_path, self.feature_names_path, self.logger)
+        self.all_model_saver = SaveLoadAllModels(logger=self.logger)
+        self.all_models_folder = 'saved_models_all'
+        self.all_model_saver = SaveLoadAllModels(folder=self.all_models_folder, logger=self.logger)
 
     def load_and_explore_data(self):
         """Loads and performs initial exploration of the data."""
@@ -55,8 +58,8 @@ class TrainingPipeline:
             set_up.describe_data(self.data)
             self.data = set_up.convert_acclass_to_numeric(self.data)
             self.logger.info(f"Shape of data after ACCLASS conversion: {self.data.shape}")
-            # engine.perform_statistical_assessments(self.data)
-            # engine.evaluate_missing_data(self.data)
+            # set_up.perform_statistical_assessments(self.data)
+            # set_up.evaluate_missing_data(self.data)
             self.visualizer = DataVisualization(self.data)
             # self.visualizer.plot_missing_data_heatmaps()
             # self.visualizer.plot_histograms()
@@ -176,27 +179,29 @@ class TrainingPipeline:
         self.logger.info(f"First 5 rows of sampled data:\n{sampled_data.head()}")
         self.data = sampled_data.copy()
         y = self.data[self.target_variable]
-        # Select the top 10 original features here
-        top_10_features = [
-            'TIME',
+        # Select the top 12 original features here
+        top_12_features = [
+            'IMPACTYPE',
             'LATITUDE',
+            'VEHTYPE',
             'LONGITUDE',
-            'ROAD_CLASS',
-            'DISTRICT',
-            'ACCLOC',
+            'TIME',
+            'MANOEUVER',
+            'DRIVACT',
+            'INITDIR',
             'TRAFFCTL',
-            'VISIBILITY',
-            'LIGHT',
-            'RDSFCOND'
+            'INVAGE',
+            'DRIVCOND',
+            'INVTYPE'
         ]
         try:
-            X = self.data[top_10_features].copy()
+            X = self.data[top_12_features].copy()
         except KeyError as e:
-            self.logger.error(f"One or more of the top 10 features not found in the data: {e}")
+            self.logger.error(f"One or more of the top 12 features not found in the data: {e}")
             return
 
-        self.logger.info(f"Shape of features (X) after selecting top 10: {X.shape}")
-        self.logger.info(f"Columns of features (X) after selecting top 10: {X.columns.tolist()}")
+        self.logger.info(f"Shape of features (X) after selecting top 12: {X.shape}")
+        self.logger.info(f"Columns of features (X) after selecting top 12: {X.columns.tolist()}")
         self.logger.info(f"Shape of target (y): {y.shape}")
 
         self.logger.info("--- Creating Preprocessing Pipeline ---")
@@ -246,7 +251,7 @@ class TrainingPipeline:
             self.visualizer.plot_feature_importance(self.feature_importance,
                                                     title="Random Forest Preprocessing Feature Importance")
             self.logger.info("--- Top Feature Importances ---")
-            self.logger.info(f"First 10 important features:\n{self.feature_importance.nlargest(10)}")
+            self.logger.info(f"First 12 important features:\n{self.feature_importance.nlargest(12)}")
 
 
     def get_feature_importance(self):
@@ -289,7 +294,7 @@ class TrainingPipeline:
 
         new_row = pd.DataFrame({
             'Model': [model_name],
-            'Accuracy': [test_accuracy],
+            'Test Accuracy': [test_accuracy],
             'Precision': [report['weighted avg']['precision']],
             'Recall': [report['weighted avg']['recall']],
             'F1-Score': [report['weighted avg']['f1-score']],
@@ -337,8 +342,78 @@ class TrainingPipeline:
 
 
 
+    # def train_and_tune_models(self):
+    #     """Trains and tunes the initialized models."""
+    #     self.logger.info("--- Training and Tuning Predictive Models ---")
+    #     if not self.models or self.X_train is None or self.y_train is None:
+    #         self.logger.error("Models not initialized or preprocessing not complete.")
+    #         return
+    #
+    #     for model_name, model in self.models.items():
+    #         tuned_model, train_time, best_params = engine.train_and_tune_model(
+    #             model_name, model, self.X_train, self.y_train, self.visualizer
+    #         )
+    #         if tuned_model:
+    #             self.tuned_models[model_name] = tuned_model
+    #             self.training_times[model_name] = train_time
+    #             self.best_params[model_name] = best_params
+    #
+    #     engine.plot_model_training_times(self.training_times)
+    #     self.logger.info("Model training and tuning complete.")
+    #     self.logger.info(f"Tuned models: {list(self.tuned_models.keys())}")
+    #     self.logger.info(f"Best parameters: {self.best_params}")
+    #
+    # def create_and_evaluate_ensembles(self):
+    #     """Creates ensemble models (Voting and Stacking)."""
+    #     self.logger.info("--- Creating Ensemble Models ---")
+    #     if not self.tuned_models or self.X_train is None or self.y_train is None:
+    #         self.logger.warning("Tuned models or data not available for ensemble creation.")
+    #         return
+    #
+    #     # Voting Ensemble
+    #     voting_ensemble = engine.create_voting_model(self.tuned_models, self.X_train, self.y_train)
+    #     if voting_ensemble:
+    #         self.tuned_models["Voting"] = voting_ensemble
+    #         self.logger.info("Voting Ensemble Model created.")
+    #
+    #     # Stacking Ensemble
+    #     stacking_ensemble = engine.create_stacking_model(self.tuned_models, self.X_train, self.y_train)
+    #     if stacking_ensemble:
+    #         self.tuned_models["Stacking"] = stacking_ensemble
+    #         self.logger.info("Stacking Ensemble Model created.")
+    #
+    # def recommend_best_model(self):
+    #     """Recommends the best model based on ROC AUC."""
+    #     if self.model_results.empty:
+    #         self.logger.warning("No model results available to recommend a best model.")
+    #         return None
+    #     best_model_row = self.model_results.sort_values(by='ROC AUC', ascending=False).iloc[0]
+    #     best_model_name = best_model_row['Model']
+    #     best_roc_auc = best_model_row['ROC AUC']
+    #     self.logger.info(f"Recommended best model: {best_model_name} (ROC AUC: {best_roc_auc:.3f})")
+    #     return best_model_name
+    #
+    # def save_best_model(self):
+    #     """Saves the best performing model, pipeline, and feature names using SaveLoadBestModel."""
+    #     self.logger.info("--- Saving Best Model and Artifacts ---")
+    #     self.logger.info(f"Best model name: {self.best_model_name}")
+    #
+    #     best_model = self.tuned_models.get(self.best_model_name)
+    #
+    #     if best_model and self.preprocessor and self.feature_names_after_preprocessing:
+    #         self.model_saver.save_model_and_pipeline(
+    #             best_model, self.preprocessor, self.feature_names_after_preprocessing
+    #         )
+    #         self.model_path = self.model_saver.model_file_path
+    #         self.pipeline_path = self.model_saver.pipeline_file_path
+    #         self.feature_names_path = self.model_saver.feature_names_file_path
+    #     else:
+    #         self.logger.warning("Best model, preprocessor, or feature names not available for saving.")
+    #
+    #     self.logger.info("--- Saving process completed ---")
+
     def train_and_tune_models(self):
-        """Trains and tunes the initialized models."""
+        """Trains and tunes the initialized models and saves them."""
         self.logger.info("--- Training and Tuning Predictive Models ---")
         if not self.models or self.X_train is None or self.y_train is None:
             self.logger.error("Models not initialized or preprocessing not complete.")
@@ -389,7 +464,7 @@ class TrainingPipeline:
         return best_model_name
 
     def save_best_model(self):
-        """Saves the best performing model, pipeline, and feature names using SaveLoadBestModel."""
+        """Saves the best performing model, pipeline, and feature names."""
         self.logger.info("--- Saving Best Model and Artifacts ---")
         self.logger.info(f"Best model name: {self.best_model_name}")
 
@@ -405,7 +480,21 @@ class TrainingPipeline:
         else:
             self.logger.warning("Best model, preprocessor, or feature names not available for saving.")
 
-        self.logger.info("--- Saving process completed ---")
+        self.logger.info("--- Saving best model process completed ---")
+
+    def save_all_models(self):
+        """Saves all trained and created models with their pipelines and feature names."""
+        self.logger.info("--- Saving All Models and Artifacts ---")
+        if not self.tuned_models or not self.preprocessor or not self.feature_names_after_preprocessing:
+            self.logger.warning("Tuned models, preprocessor, or feature names not available for saving all models.")
+            return
+
+        for model_name, model in self.tuned_models.items():
+            self.all_model_saver.save_model_artifacts(
+                model, self.preprocessor, self.feature_names_after_preprocessing, model_name
+            )
+
+        self.logger.info("--- Saving all models process completed ---")
 
 
 

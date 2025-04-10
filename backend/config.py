@@ -8,7 +8,16 @@ PREPROCESSOR_PATH = BASE_DIR / "saved_models/preprocessor.pkl"
 
 # Expected features
 EXPECTED_FEATURES = [
-    'TIME', 'LATITUDE', 'LONGITUDE', 'ROAD_CLASS',
-    'DISTRICT', 'ACCLOC', 'TRAFFCTL', 'VISIBILITY',
-    'LIGHT', 'RDSFCOND'
-]
+            'IMPACTYPE',
+            'LATITUDE',
+            'VEHTYPE',
+            'LONGITUDE',
+            'TIME',
+            'MANOEUVER',
+            'DRIVACT',
+            'INITDIR',
+            'TRAFFCTL',
+            'INVAGE',
+            'DRIVCOND',
+            'INVTYPE'
+        ]

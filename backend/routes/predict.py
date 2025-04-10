@@ -38,6 +38,7 @@ def _validate_input(input_data: dict) -> tuple or None:
 
     return None
 
+
 @predict_bp.route('/predict', methods=['POST'])
 def predict():
     try:
@@ -48,10 +49,19 @@ def predict():
         # Process input
         input_df = pd.DataFrame([data['features']])
         processed_input = preprocessor.transform(input_df)
-        prediction = int(model.predict(processed_input)[0])
-        proba = model.predict_proba(processed_input)[0][prediction] if hasattr(model, 'predict_proba') else None
 
-        logger.info(f"Prediction: {prediction} (confidence={proba:.2f})")
+        # Get feature names after transformation
+        try:
+            feature_names_after_transform = preprocessor.get_feature_names_out().tolist()
+            processed_df = pd.DataFrame(processed_input, columns=feature_names_after_transform)
+        except Exception as e:
+            app.logger.warning(f"Could not retrieve feature names after transform: {e}")
+            processed_df = pd.DataFrame(processed_input) # No column names
+
+        proba = model.predict_proba(processed_df)[0][1] if hasattr(model, 'predict_proba') else None
+        prediction = 1 if proba > 0.5 else 0
+
+        logger.info(f"Prediction: {prediction} (probability of class 1={proba:.2f})")
         return jsonify({
             'prediction': prediction,
             'probability': round(proba, 4) if proba else None
@@ -60,3 +70,25 @@ def predict():
     except Exception as e:
         logger.critical(f"Prediction failed: {str(e)}", exc_info=True)
         return jsonify({'error': 'Internal server error'}), 500
+# @predict_bp.route('/predict', methods=['POST'])
+# def predict():
+#     try:
+#         data = request.get_json()
+#         if error := _validate_input(data):
+#             return error
+#
+#         # Process input
+#         input_df = pd.DataFrame([data['features']])
+#         processed_input = preprocessor.transform(input_df)
+#         prediction = int(model.predict(processed_input)[0])
+#         proba = model.predict_proba(processed_input)[0][prediction] if hasattr(model, 'predict_proba') else None
+#
+#         logger.info(f"Prediction: {prediction} (confidence={proba:.2f})")
+#         return jsonify({
+#             'prediction': prediction,
+#             'probability': round(proba, 4) if proba else None
+#         })
+#
+#     except Exception as e:
+#         logger.critical(f"Prediction failed: {str(e)}", exc_info=True)
+#         return jsonify({'error': 'Internal server error'}), 500
