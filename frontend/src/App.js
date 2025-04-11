@@ -1,15 +1,17 @@
 import React from 'react';
 import { CssBaseline, Container } from '@mui/material';
-import FeatureInputForm from "./components/FeatureInputForm";
+import FeatureInputForm from "./components/FeatureInputForm/FeatureInputForm";
+import theme from "./styles/theme";
+import {ThemeProvider} from "@mui/material/styles";
 
 function App() {
   return (
-    <>
-      <CssBaseline />
-      <Container maxWidth={false} disableGutters>
-          <FeatureInputForm />
-      </Container>
-    </>
+     <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <Container maxWidth={false} disableGutters>
+              <FeatureInputForm />
+          </Container>
+     </ThemeProvider>
   );
 }
 

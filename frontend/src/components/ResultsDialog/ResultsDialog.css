@@ -1,0 +1,48 @@
+/* Severity indicator */
+.severity-indicator {
+  height: 6px;
+}
+
+/* Header styles */
+.dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+/* Severity card styles */
+.severity-card {
+  padding: 24px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.severity-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+/* Probability display styles */
+.probability-container {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.probability-label {
+  min-width: 100px;
+}
+
+.probability-bar {
+  flex-grow: 1;
+  height: 8px;
+  border-radius: 4px;
+}
+
+.probability-value {
+  font-weight: bold;
+}
