@@ -62,7 +62,10 @@ def predict():
         prediction = 1 if proba > 0.5 else 0
 
         logger.info(f"Prediction: {prediction} (probability of class 1={proba:.2f})")
+        logger.info(f"mode name: {type(model).__name__}")
+
         return jsonify({
+            'model': type(model).__name__,
             'prediction': prediction,
             'probability': round(proba, 4) if proba else None
         })

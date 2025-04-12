@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
-import axios from 'axios';
-import {TextField, Button, Typography, Paper, Grid, Container, Box, Divider, Alert, MenuItem, CircularProgress} from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import {TextField, Button, Typography, Paper, Grid, Container, Box, Divider, Alert, MenuItem, CircularProgress, ButtonGroup} from '@mui/material';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
@@ -8,9 +7,13 @@ import PersonIcon from '@mui/icons-material/Person';
 import TrafficIcon from '@mui/icons-material/Traffic';
 import ResultsDialog from '../ResultsDialog/ResultsDialog';
 import './FeatureInputForm.css';
+import {
+  fetchAvailableModels,
+  predictWithBestModel,
+  predictWithSelectedModel
+} from '../../api/modelApi';
 
 const FeatureInputForm = () => {
-  // Initialize with values that produce fatal prediction
   const [features, setFeatures] = useState({
     TIME: '09:00',
     LATITUDE: '43.700667',
@@ -26,12 +29,29 @@ const FeatureInputForm = () => {
     INVTYPE: 'Passenger'
   });
 
-  const [selectedModel, setSelectedModel] = useState("random_forest");
+  const [availableModels, setAvailableModels] = useState([]);
+  const [selectedModel, setSelectedModel] = useState('');
+  const [predictionMode, setPredictionMode] = useState('best');
   const [prediction, setPrediction] = useState(null);
   const [probability, setProbability] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [openResults, setOpenResults] = useState(false);
+
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        const models = await fetchAvailableModels();
+        setAvailableModels(models);
+        if (models.length > 0) {
+          setSelectedModel(models[0]);
+        }
+      } catch (err) {
+        setError('Failed to load available models');
+      }
+    };
+    loadModels();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -44,22 +64,21 @@ const FeatureInputForm = () => {
     setError(null);
 
     try {
-      const requestData = {
-        features: {
-          ...features,
-          LATITUDE: parseFloat(features.LATITUDE),
-          LONGITUDE: parseFloat(features.LONGITUDE)
-        }
+      const formattedFeatures = {
+        ...features,
+        LATITUDE: parseFloat(features.LATITUDE),
+        LONGITUDE: parseFloat(features.LONGITUDE)
       };
 
-      console.log("Sending to backend:", requestData);
+      let result;
+      if (predictionMode === 'best') {
+        result = await predictWithBestModel(formattedFeatures);
+      } else {
+        result = await predictWithSelectedModel(selectedModel, formattedFeatures);
+      }
 
-      const res = await axios.post('http://localhost:5000/predict', requestData);
-
-      console.log("Received from backend:", res.data);
-
-      setPrediction(res.data.prediction);
-      setProbability(res.data.probability);
+      setPrediction(result.prediction);
+      setProbability(result.probability);
       setOpenResults(true);
     } catch (err) {
       setError(err.response?.data?.error || 'Prediction failed. Please try again.');
@@ -91,6 +110,51 @@ const FeatureInputForm = () => {
 
           {/* Form Section */}
           <Box component="form" onSubmit={handleSubmit} className="form">
+            {/* Prediction Mode Selection */}
+            <Box sx={{ mb: 3 }}>
+              <ButtonGroup fullWidth>
+                <Button
+                  variant={predictionMode === 'best' ? 'contained' : 'outlined'}
+                  onClick={() => setPredictionMode('best')}
+                >
+                  Use Best Model
+                </Button>
+                <Button
+                  variant={predictionMode === 'select' ? 'contained' : 'outlined'}
+                  onClick={() => setPredictionMode('select')}
+                >
+                  Select Model
+                </Button>
+              </ButtonGroup>
+            </Box>
+
+            {/* Model Selection (only shown when in select mode) */}
+            {predictionMode === 'select' && (
+              <div className="form-section">
+                <Typography variant="h6" className="section-title">
+                  Model Selection
+                </Typography>
+                <Divider className="section-divider"/>
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <TextField
+                      select
+                      fullWidth
+                      label="Select Prediction Model"
+                      value={selectedModel}
+                      onChange={(e) => setSelectedModel(e.target.value)}
+                      variant="outlined"
+                      margin="normal"
+                    >
+                      {availableModels.map((model) => (
+                        <MenuItem key={model} value={model}>{model}</MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                </Grid>
+              </div>
+            )}
+
             {/* Time Section */}
             <div className="form-section">
               <Typography variant="h6" className="section-title">
@@ -99,7 +163,7 @@ const FeatureInputForm = () => {
               </Typography>
               <Divider className="section-divider"/>
               <Grid container spacing={2}>
-                <Grid>
+                <Grid item xs={12}>
                   <TextField
                     fullWidth
                     label="Time (HH:MM)"
@@ -122,7 +186,7 @@ const FeatureInputForm = () => {
               </Typography>
               <Divider className="section-divider"/>
               <Grid container spacing={2}>
-                <Grid>
+                <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
                     label="Latitude"
@@ -135,7 +199,7 @@ const FeatureInputForm = () => {
                     required
                   />
                 </Grid>
-                <Grid>
+                <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
                     label="Longitude"
@@ -159,7 +223,7 @@ const FeatureInputForm = () => {
               </Typography>
               <Divider className="section-divider"/>
               <Grid container spacing={2}>
-                <Grid>
+                <Grid item xs={12} sm={6}>
                   <TextField
                     select
                     fullWidth
@@ -170,10 +234,12 @@ const FeatureInputForm = () => {
                     variant="outlined"
                     margin="normal"
                   >
-                    {['Pedestrian Collisions', 'Turning Movement', 'Angle', 'Rear End', 'Sideswipe', 'Other'].map(option => (<MenuItem key={option} value={option}>{option}</MenuItem>))}
+                    {['Pedestrian Collisions', 'Turning Movement', 'Angle', 'Rear End', 'Sideswipe', 'Other'].map(option => (
+                      <MenuItem key={option} value={option}>{option}</MenuItem>
+                    ))}
                   </TextField>
                 </Grid>
-                <Grid>
+                <Grid item xs={12} sm={6}>
                   <TextField
                     select
                     fullWidth
@@ -189,7 +255,7 @@ const FeatureInputForm = () => {
                     ))}
                   </TextField>
                 </Grid>
-                <Grid>
+                <Grid item xs={12} sm={6}>
                   <TextField
                     select
                     fullWidth
@@ -205,7 +271,7 @@ const FeatureInputForm = () => {
                     ))}
                   </TextField>
                 </Grid>
-                <Grid>
+                <Grid item xs={12} sm={6}>
                   <TextField
                     select
                     fullWidth
@@ -232,7 +298,7 @@ const FeatureInputForm = () => {
               </Typography>
               <Divider className="section-divider"/>
               <Grid container spacing={2}>
-                <Grid>
+                <Grid item xs={12} sm={6}>
                   <TextField
                     select
                     fullWidth
@@ -248,7 +314,7 @@ const FeatureInputForm = () => {
                     ))}
                   </TextField>
                 </Grid>
-                <Grid>
+                <Grid item xs={12} sm={6}>
                   <TextField
                     select
                     fullWidth
@@ -275,7 +341,7 @@ const FeatureInputForm = () => {
               </Typography>
               <Divider className="section-divider"/>
               <Grid container spacing={2}>
-                <Grid>
+                <Grid item xs={12} sm={6}>
                   <TextField
                     select
                     fullWidth
@@ -291,7 +357,7 @@ const FeatureInputForm = () => {
                     ))}
                   </TextField>
                 </Grid>
-                <Grid>
+                <Grid item xs={12} sm={6}>
                   <TextField
                     select
                     fullWidth
@@ -307,7 +373,7 @@ const FeatureInputForm = () => {
                     ))}
                   </TextField>
                 </Grid>
-                <Grid>
+                <Grid item xs={12}>
                   <TextField
                     select
                     fullWidth
@@ -321,31 +387,6 @@ const FeatureInputForm = () => {
                     {['Passenger', 'Driver', 'Pedestrian', 'Cyclist'].map(option => (
                       <MenuItem key={option} value={option}>{option}</MenuItem>
                     ))}
-                  </TextField>
-                </Grid>
-              </Grid>
-            </div>
-
-            {/* Model Selection Section */}
-            <div className="form-section">
-              <Typography variant="h6" className="section-title">
-                Model Selection
-              </Typography>
-              <Divider className="section-divider"/>
-              <Grid container spacing={2}>
-                <Grid>
-                  <TextField
-                    select
-                    fullWidth
-                    label="Select Prediction Model"
-                    value={selectedModel}
-                    onChange={(e) => setSelectedModel(e.target.value)}
-                    variant="outlined"
-                    margin="normal"
-                  >
-                    <MenuItem value="random_forest">Random Forest</MenuItem>
-                    <MenuItem value="xgboost">SVM</MenuItem>
-                    <MenuItem value="logistic_regression">Logistic Regression</MenuItem>
                   </TextField>
                 </Grid>
               </Grid>
@@ -382,7 +423,7 @@ const FeatureInputForm = () => {
         onClose={handleCloseResults}
         probability={probability}
         prediction={prediction}
-        selectedModel={selectedModel}
+        selectedModel={predictionMode === 'best' ? 'Best Model' : selectedModel}
       />
     </div>
   );
