@@ -77,7 +77,7 @@ const ResultsDialog = ({ open, onClose, probability, prediction, selectedModel }
               className="probability-bar"
               sx={{
                 '& .MuiLinearProgress-bar': {
-                  backgroundColor: probability > 0.7
+                  backgroundColor: probability > 0.5
                     ? theme.palette.error.main
                     : theme.palette.primary.main
                 }
