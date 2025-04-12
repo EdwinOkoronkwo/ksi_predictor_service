@@ -73,6 +73,7 @@ const FeatureInputForm = () => {
       let result;
       if (predictionMode === 'best') {
         result = await predictWithBestModel(formattedFeatures);
+        setSelectedModel(result.model || 'Best Model');
       } else {
         result = await predictWithSelectedModel(selectedModel, formattedFeatures);
       }
@@ -423,7 +424,7 @@ const FeatureInputForm = () => {
         onClose={handleCloseResults}
         probability={probability}
         prediction={prediction}
-        selectedModel={predictionMode === 'best' ? 'Best Model' : selectedModel}
+        selectedModel={predictionMode === 'best' ? selectedModel : selectedModel}
       />
     </div>
   );

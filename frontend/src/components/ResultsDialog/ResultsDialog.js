@@ -40,6 +40,7 @@ const ResultsDialog = ({ open, onClose, probability, prediction, selectedModel }
           />
           <Typography variant="h5">Results</Typography>
         </div>
+        {/*{console.log(selectedModel)}*/}
         <Typography variant="body2">
           Prediction Model: {selectedModel.replace('_', ' ').toUpperCase()}
         </Typography>
